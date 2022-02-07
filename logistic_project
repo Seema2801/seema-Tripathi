@@ -1,0 +1,652 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Aug 17 21:35:14 2021
+
+@author: seema
+"""
+
+# Import Libraries
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+import statsmodels.api as smapi
+from sklearn.metrics import confusion_matrix,classification_report
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn import metrics
+import numpy as np
+from sklearn.preprocessing import LabelEncoder 
+from sklearn.feature_selection import f_classif
+from imblearn.pipeline import Pipeline
+from imblearn.over_sampling import SMOTE
+from imblearn.under_sampling import RandomUnderSampler
+from imblearn.under_sampling import NearMiss
+
+# read the file
+pathh='/home/seema/.cache/.fr-CQJPrt/Vaccine Usage Prediction/Dataset/h1n1_vaccine_prediction.csv'
+
+data=pd.read_csv(pathh)
+
+
+# First 10  row of our data
+data.head(10)
+
+
+# Last 10 row of our data
+data.tail(10)
+
+# shape of data
+data.shape
+
+# columns name of our dataset
+data.columns
+
+
+
+
+
+# Function : split col into numeric and factor
+def splitcols(data):
+    nc=data.select_dtypes(exclude='object').columns.values
+    fc=data.select_dtypes(include='object').columns.values
+    return (nc,fc)
+
+
+nc,fc=splitcols(data)
+
+
+
+
+
+
+
+ # check the distribution of the y variable
+sns.countplot(x='h1n1_vaccine',data=data)
+plt.title('distribution of classes')
+
+
+data1.h1n1_vaccine.value_counts()
+
+# EDA
+
+data.info()
+
+# desc the data
+descr=data[nc].describe()
+for c in nc:
+    print('numeric column=',c)
+    print(descr[c])
+    print('----')
+
+
+
+
+
+
+# count the value of data
+
+for c in nc:
+    countss=data[c].value_counts()
+    print('numerc',c)
+    print(countss)
+    print('.....')
+    
+
+nc,fc=splitcols(data)
+
+
+# Function: check for distribution/outliers/multicolinerity
+def plotdata(data,nc,ctype):
+    
+    if ctype not in['h','c','b']:
+        msg='invalid chart type specified'
+        return(msg)
+    
+    if ctype=='c':
+       cor = data[nc].corr()
+       cor = np.tril(cor)
+       sns.heatmap(cor,vmin=-1,vmax=1,xticklabels=nc,
+                yticklabels=nc,square=False,annot=True,linewidths=3)
+
+    else:
+        COLS=2
+        ROWS=np.ceil(len(nc)/COLS)
+        POS=1
+        
+        fig=plt.figure()
+        for c in nc:
+            fig.add_subplot(ROWS,COLS,POS)
+            if ctype=='b':
+                sns.boxplot(data[c],color='yellow')
+            else:
+                sns.distplot(data[c],bins=20,color='green')
+    
+         
+            POS+=1
+        return(1)  
+
+  
+nc,fc=splitcols(data)
+
+
+# call function
+plotdata(data,nc,'b')  # Outliers
+plotdata(data,nc,'h')  # distribution
+plotdata(data,nc,'c')  # correlation
+
+    
+
+# generic function to split data to build model
+def splitdata(data,y,ratio=0.3):
+    trainx,testx,trainy,testy=train_test_split(data.drop(y, 1),data[y], 
+                                                          test_size=ratio)
+    return(trainx,trainy,testx,testy)
+
+
+# function : build Logistic regression  model
+
+def buildmodel(trainx,trainy):
+      model=smapi.Logit(trainy,trainx).fit()    
+      return(model)
+  
+
+# function to predict the vaccine prediction and convert probability  into classes
+def predictclass(probs,cutoff):
+    if(0<=cutoff<=1):
+        p=probs.copy()
+        p[p<cutoff]=0
+        p[p>cutoff]=1
+        
+        return(p)
+
+
+# Function for confusion matrix
+def cm(actual,predicted):
+    df=pd.DataFrame({'actual':actual,'predicted':predicted})
+    print(pd.crosstab(df.actual,df.predicted,margins=True))
+
+    print(classification_report(actual,predicted))
+
+
+
+
+# checking for nulls
+data.isnull().sum()
+
+# copy data
+data1=data.copy()
+
+# drop irelevant  variable  and those variable  where  singularity is greater than 80% 
+col=['unique_id','sex','race','marital_status','wash_hands_frequently','antiviral_medication','bought_face_mask','is_health_worker','cont_child_undr_6_mnths']
+
+data1.drop(columns=col,inplace=True)
+
+data1.shape
+ 
+plotdata(data, nc, 'c')
+
+# remove strings in age_bracket feature
+data1.age_bracket.value_counts()
+data1['age']=data['age_bracket'].str.replace('Years','')
+
+data1.drop(columns='age_bracket',inplace=True)
+
+
+
+nc,fc=splitcols(data1)
+
+#check for nulls
+data1.isnull().sum()
+
+# impute nulls by  random number with in its range
+
+ # these features have binary class so we impute missing value in binary class  
+cols=['h1n1_worry','h1n1_awareness','contact_avoidance','avoid_large_gatherings','reduced_outside_home_cont','avoid_touch_face','dr_recc_h1n1_vacc','dr_recc_seasonal_vacc','chronic_medic_condition','has_health_insur']   
+
+for c in cols:
+   data1[c]=data1[c].fillna(np.random.randint(0,2))
+ 
+    
+   
+# multiclass   
+cols2=['is_h1n1_vacc_effective','is_h1n1_risky','sick_from_h1n1_vacc','is_seas_vacc_effective','is_seas_risky','sick_from_seas_vacc']   
+
+nc,fc=splitcols(data)
+    
+for c in cols2:
+   data1[c]=data1[c].fillna(np.random.randint(1,6))
+   
+ 
+
+data1.no_of_adults=data1.no_of_adults.fillna(np.random.randint(0,4))
+
+data1.no_of_children=data1.no_of_children.fillna(np.random.randint(0,4))
+
+
+# check after replace
+data1[nc].isnull().sum() 
+
+
+# check null in factor columns and if their is null impute it with mode
+data1[fc].isnull().sum() 
+for i in fc:    
+    data1[i]=data1[i].fillna(data1[i].mode()[0])
+    
+ # check   
+data1.isnull().sum()  
+    
+ 
+# decrease the labels
+   
+# employment
+data.employment.value_counts()
+emp_indx=data.employment[data.employment==('Not in Labor Force')].index
+data.employment[emp_indx]='Unemployed'
+data.employment.value_counts()
+
+
+# census_msa
+census_indx=data.census_msa[data.census_msa==('Non-MSA')].index
+data.census_msa[census_indx]='No'
+census_indx=data.census_msa[data.census_msa==('MSA, Not Principle  City')].index
+data.census_msa[census_indx]='No'
+census_indx=data.census_msa[data.census_msa==('MSA, Principle City')].index
+
+data.census_msa[census_indx]='Yes'
+data.census_msa.unique()
+
+
+
+
+data2=data1.copy()
+
+# convert string variable into numeric using Label Encoding
+   
+le=LabelEncoder()
+for i in fc:   
+    data1[i]= le.fit_transform(data1[i])
+    print(data1)
+
+
+
+
+
+# split data into train and test
+trainx1,trainy1,testx1,testy1=splitdata(data1,'h1n1_vaccine')
+(trainx1.shape,trainy1.shape,testx1.shape,testy1.shape)
+
+# build model
+m1=buildmodel(trainx1,trainy1)
+
+# summary
+m1.summary()
+p1=m1.predict(testx1)
+cutoff=0.25
+pred_y1=predictclass(p1,cutoff)
+
+# confusion matrix
+cm(testy1,pred_y1)
+
+data1.h1n1_vaccine.value_counts()
+
+#......................
+
+
+
+
+nc,fc=splitcols(data1)
+
+
+# Feature selection
+def bestFeatures(trainx,trainy):
+    features = trainx.columns
+    
+    fscore,pval = f_classif(trainx,trainy)
+    
+    df = pd.DataFrame({'feature':features, 'fscore':fscore,'pval':pval})
+    df = df.sort_values('fscore',ascending=False)
+    return(df)
+
+
+bestFeatures(trainx1, trainy1)
+
+
+# Drop Irrelevent feature
+data1=data1.drop(columns=['census_msa','sick_from_seas_vacc','no_of_adults','no_of_children','employment','income_level','avoid_large_gatherings','reduced_outside_home_cont'],axis=1)
+
+# split data
+trainx2,trainy2,testx2,testy2=splitdata(data1,'h1n1_vaccine')
+(trainx2.shape,trainy2.shape,testx2.shape,testy2.shape)
+
+# build model
+m2=buildmodel(trainx2,trainy2)
+
+
+# summary
+m2.summary()
+
+p2=m2.predict(testx2)
+cutoff=0.25
+pred_y2=predictclass(p2,cutoff)
+# confusion matrix
+cm(testy2,pred_y2)
+cm(testy1,pred_y1)
+
+
+
+......................
+
+
+nc,fc=splitcols(data2)
+fc
+
+
+# model building using dummy variable
+
+for c in fc:
+     dummy=pd.get_dummies(data2[c],drop_first=True,prefix=c)
+     data2=data2.join(dummy)
+     
+data2.shape
+data2.drop(columns=fc, inplace=True)
+
+data2.dtypes
+nc,fc=splitcols(data2)
+
+# split data
+trainx6,trainy6,testx6,testy6=splitdata(data2,'h1n1_vaccine')
+(trainx6.shape,trainy6.shape,testx6.shape,testy6.shape)
+
+# build model
+m6=buildmodel(trainx6,trainy6)
+
+# summary
+m6.summary()
+p6=m6.predict(testx6)
+cutoff=0.4
+pred6=predictclass(p6,cutoff)
+
+# confusion matrix
+cm(testy6,pred6)
+
+
+
+# oversampling technique
+# -----------------------
+
+sm=SMOTE()
+smX,smY = sm.fit_resample(data1.drop('h1n1_vaccine',1),data1.h1n1_vaccine)
+
+# create the new dataset
+data3 = smX.join(smY)
+
+# after over sampling check the distribution of y variable
+sns.countplot(x='h1n1_vaccine',data=data3)
+plt.title('distribution of classes')
+data1.h1n1_vaccine.value_counts()
+
+# compare the 2 datasets (original / oversampled)
+len(data1), len(data3)
+
+# compare distribution of classes (original / oversampled)
+data.h1n1_vaccine.value_counts(), data3.h1n1_vaccine.value_counts()
+len(trainx1),len(testx1),len(trainy1),len(testy1)
+
+# build and predict : Model M2
+trainx3,trainy3,testx3,testy3 = splitdata(data3,'h1n1_vaccine')
+trainx3.shape,trainy3.shape,testx3.shape,testy3.shape
+
+m3 = buildmodel(trainx3,trainy3)
+m3.summary()
+p3 = m3.predict(testx3)
+cutoff = 0.5
+pred_y3 = predictclass(p3,cutoff)
+cm(testy3,pred_y3)
+data2.dtypes
+.......................
+
+
+
+
+
+# undersampling technique
+
+nm = NearMiss()
+nmX,nmY = nm.fit_resample(data1.drop('h1n1_vaccine',1),data1.h1n1_vaccine)
+
+
+# create the new dataset
+data4= nmX.join(nmY)
+
+
+# check distribtuion of y variable
+sns.countplot(x='h1n1_vaccine',data=data4)
+plt.title('distribution of classes')
+data4.h1n1_vaccine.value_counts()
+
+# compare the 2 datasets (original / oversampled)
+len(data1), len(data4)
+
+# compare distribution of classes (original / oversampled)
+data2.h1n1_vaccine.value_counts(), data4.h1n1_vaccine.value_counts()
+
+# build and predict : Model M3
+trainx4,trainy4,testx4,testy4 = splitdata(data4,'h1n1_vaccine')
+trainx3.shape,trainy3.shape,testx3.shape,testy3.shape
+
+m4 = buildmodel(trainx4,trainy4)
+m4.summary()
+p4 = m4.predict(testx4)
+cutoff = 0.45
+pred_y4 = predictclass(p4,cutoff)
+cm(testy4,pred_y4)
+cm(testy2,pred_y2)
+cm(testy3,pred_y3)
+
+...................
+# balanced sampling
+
+# ------------------
+
+
+perc=0.75
+oversamp=SMOTE(sampling_strategy = perc)
+undersamp=RandomUnderSampler(sampling_strategy = perc)
+
+steps = [('o',oversamp), ('u',undersamp)]
+
+bsX,bsY = Pipeline(steps=steps).fit_resample(data1.drop('h1n1_vaccine',1),data1.h1n1_vaccine)
+
+# create the new dataset
+data5 = bsX.join(bsY)
+
+# 
+sns.countplot(x='h1n1_vaccine',data=data5)
+plt.title('distribution of classes')
+data5.h1n1_vaccine.value_counts()
+
+
+# compare the 2 datasets (original / balanced sample)
+len(data1), len(data4)
+
+# compare distribution of classes (original / oversampled)
+data1.h1n1_vaccine.value_counts(), data5.h1n1_vaccine.value_counts()
+
+# build and predict : Model M4
+trainx5,trainy5,testx5,testy5 = splitdata(data5,'h1n1_vaccine')
+trainx5.shape,trainy5.shape,testx5.shape,testy5.shape
+
+m5= buildmodel(trainx5,trainy5)
+m5.summary()
+p5 = m5.predict(testx5)
+cutoff = 0.5
+pred_y5 = predictclass(p5,cutoff)
+cm(testy5,pred_y5)
+..............................
+
+
+# dummy variable
+
+data2.isnull().sum()
+nc,fc=splitcols(data2)
+fc
+# dummy variable
+for c in fc:
+     dummy=pd.get_dummies(data2[c],drop_first=True,prefix=c)
+     data2=data2.join(dummy)
+     
+data2.shape
+data2.drop(columns=fc, inplace=True)
+
+data2.dtypes
+nc,fc=splitcols(data2)
+
+# split data
+trainx6,trainy6,testx6,testy6=splitdata(data2,'h1n1_vaccine')
+(trainx6.shape,trainy6.shape,testx6.shape,testy6.shape)
+
+# build model
+m6=buildmodel(trainx6,trainy6)
+
+# summary
+m6.summary()
+p6=m6.predict(testx6)
+cutoff=0.4
+pred6=predictclass(p6,cutoff)
+# confusion matrix
+cm(testy6,pred6)
+
+
+
+
+cm(testy4,pred_y4)
+cm(testy3,pred_y3)
+cm(testy2,pred_y2)
+cm(testy1,pred_y1)
+cm(testy6,pred6)
+cm(testy4,pred5)
+
+
+
+# conclusion
+
+'''
+
+Model1 : on Raw data:remove irrelevent and singularity features and conversion of factor column into numeric using label encoder
+
+predicted   0.0   1.0   All
+actual                     
+0          5089  1209  6298
+1           809   906  1715
+All        5898  2115  8013
+              precision    recall  f1-score   support
+
+           0       0.86      0.81      0.83      6298
+           1       0.43      0.53      0.47      1715
+
+    accuracy                           0.75      8013
+   macro avg       0.65      0.67      0.65      8013
+weighted avg       0.77      0.75      0.76      8013
+
+
+
+
+Model2:Feature Selection on model1
+
+predicted   0.0   1.0   All
+actual                     
+0          5089  1209  6298
+1           809   906  1715
+All        5898  2115  8013
+              precision    recall  f1-score   support
+
+           0       0.86      0.81      0.83      6298
+           1       0.43      0.53      0.47      1715
+
+    accuracy                           0.75      8013
+   macro avg       0.65      0.67      0.65      8013
+weighted avg       0.77      0.75      0.76      8013
+
+
+
+         
+Model3: over sampling on model2
+predicted   0.0   1.0   All
+actual                     
+0          5089  1209  6298
+1           809   906  1715
+All        5898  2115  8013
+              precision    recall  f1-score   support
+
+           0       0.86      0.81      0.83      6298
+           1       0.43      0.53      0.47      1715
+
+    accuracy                           0.75      8013
+   macro avg       0.65      0.67      0.65      8013
+weighted avg       0.77      0.75      0.76      8013
+          
+          
+Model4: under sampling on model 2
+predicted   0.0   1.0   All
+actual                     
+0          1201   510  1711
+1           420  1274  1694
+All        1621  1784  3405
+                  precision    recall  f1-score   support
+
+           0       0.74      0.70      0.72      1711
+           1       0.71      0.75      0.73      1694
+
+    accuracy                           0.73      3405
+   macro avg       0.73      0.73      0.73      3405
+weighted avg       0.73      0.73      0.73      3405
+
+
+Model5: balanced sampling
+
+         
+Model6: on dummy variable
+predicted   0.0   1.0    All
+actual                      
+0          4832  1448   6280
+1          1758  3004   4762
+All        6590  4452  11042
+              precision    recall  f1-score   support
+
+           0       0.73      0.77      0.75      6280
+           1       0.67      0.63      0.65      4762
+
+    accuracy                           0.71     11042
+   macro avg       0.70      0.70      0.70     11042
+weighted avg       0.71      0.71      0.71     11042
+
+
+
+# 6 dummy variable
+
+       predicted   0.0   1.0   All
+actual                     
+0          4721  1556  6277
+1           621  1115  1736
+All        5342  2671  8013
+              precision    recall  f1-score   support
+
+           0       0.88      0.75      0.81      6277
+           1       0.42      0.64      0.51      1736
+
+    accuracy                           0.73      8013
+   macro avg       0.65      0.70      0.66      8013
+weighted avg       0.78      0.73      0.75      8013  
+
+
+
+
+'''
+
+
+
+
+
+
+
